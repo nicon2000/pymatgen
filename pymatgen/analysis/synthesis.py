@@ -26,18 +26,18 @@ class PDSynthesisTree:
     elements.
     """
 
-    def __init__(self, entries, max_nelement=2):
+    def __init__(self, entries, max_nelements=2):
         """
-
-        :param entries ([ComputedEntry]): The computed entries from which to
-            perform the phase diagram analysis.
-        :param nelement_reactant (float): This sets a limit as to how many
-            elements each reactant should have before the analysis is stopped.
-            Default is 2 for binaries. Set to 1 for elements.
+        Args:
+            entries ([ComputedEntry]): The computed entries from which to
+                perform the phase diagram analysis.
+            max_nelements (float): This sets a limit as to how many
+                elements each reactant should have before the analysis is
+                stopped. Default is 2 for binaries. Set to 1 for elements.
         """
         self.pd = PhaseDiagram(entries)
         self.stable_entries = self.pd.stable_entries
-        self.max_nlement = max_nelement
+        self.max_nelements = max_nelements
 
     def get_reaction_tree(self, target):
         # Recursive algo to get all reactions
@@ -53,9 +53,10 @@ class PDSynthesisTree:
             rx_str = " + ".join(
                 sorted([e.composition.reduced_formula for e in decomp.keys()]))
             child = Node(rx_str, parent, decomp=decomp,
-                         avg_nelements=np.mean([len(e.composition) for e in decomp.keys()]))
+                         avg_nelements=np.mean([len(e.composition)
+                                                for e in decomp.keys()]))
             for e in decomp.keys():
-                if not len(e.composition) <= self.max_nlement:
+                if not len(e.composition) <= self.max_nelements:
                     to_remove.add(e.composition.reduced_formula)
                     _get_tree(child, to_remove)
             return parent
