@@ -39,11 +39,21 @@ class PDSynthesisTree:
         self.stable_entries = self.pd.stable_entries
         self.max_nelements = max_nelements
 
-    def get_reaction_tree(self, target):
-        # Recursive algo to get all reactions
+    def get_synthesis_tree(self, target):
+        """
+        Generates synthesis tree for a target.
+
+        Args:
+            target (Composition/str): Target composition to get synthesis tree
+                for.
+
+        Returns:
+            anytree.Node containing the entire synthesis tree.
+        """
         target = Composition(target)
 
         def _get_tree(parent, to_remove):
+            # Recursive algo to get all reactions
             to_remove = set(to_remove)
             to_remove.add(target.reduced_formula)
             new_stable = [e for e in self.stable_entries if
@@ -67,6 +77,17 @@ class PDSynthesisTree:
 
         return _get_tree(t, set())
 
+    def get_unique_reactions(self, target):
+        rxn_tree = self.get_synthesis_tree(target)
+        nodes = []
+        names = set()
+        for pre, fill, node in RenderTree(rxn_tree):
+            if node.name not in names:
+                nodes.append(node)
+                names.add(node.name)
+
+        return sorted(nodes, key=lambda n: n.avg_nelements)
+
 
 def print_rxn_tree(rxn_tree, target, balanced_rxn_str=False):
     for pre, fill, node in RenderTree(rxn_tree):
@@ -89,10 +110,10 @@ class PDSynthesisTreeTest(PymatgenTest):
         mpr = MPRester()
         cls.lfo_entries = mpr.get_entries_in_chemsys(["Li", "Fe", "O"])
 
-    def test_get_reactions(self):
+    def test_get_synthesis_tree(self):
         target = "LiFeO2"
         a = PDSynthesisTree(self.lfo_entries)
-        rxn_tree = a.get_reaction_tree(target)
+        rxn_tree = a.get_synthesis_tree(target)
         print_rxn_tree(rxn_tree, target)
         # Balancing rxn is costly due to inefficient implementation for now,
         # and creates lots of visual noise. We do this for this small system to
@@ -102,8 +123,11 @@ class PDSynthesisTreeTest(PymatgenTest):
 
         # This breaks everything to elements
         a = PDSynthesisTree(self.lfo_entries, 1)
-        rxn_tree = a.get_reaction_tree(target)
+        rxn_tree = a.get_synthesis_tree(target)
         print_rxn_tree(rxn_tree, target)
+
+        for rxn in a.get_unique_reactions(target):
+            print("%s (avg_nelements = %.2f)" % (rxn.name, rxn.avg_nelements))
 
 
 if __name__ == "__main__":
