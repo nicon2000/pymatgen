@@ -88,6 +88,12 @@ class PDSynthesisTree:
 
         return sorted(nodes, key=lambda n: n.avg_nelements)
 
+    @classmethod
+    def from_mp(cls, chemsys, **kwargs):
+        mpr = MPRester()
+        entries = mpr.get_entries_in_chemsys(chemsys)
+        return PDSynthesisTree(entries, **kwargs)
+
 
 def print_rxn_tree(rxn_tree, target, balanced_rxn_str=False):
     for pre, fill, node in RenderTree(rxn_tree):
@@ -107,8 +113,11 @@ class PDSynthesisTreeTest(PymatgenTest):
 
     @classmethod
     def setUpClass(cls):
-        mpr = MPRester()
-        cls.lfo_entries = mpr.get_entries_in_chemsys(["Li", "Fe", "O"])
+        from monty.serialization import loadfn
+        import pymatgen
+        import os
+        test_path = os.path.join(os.path.abspath(os.path.dirname(pymatgen.__file__)), "..", "test_files")
+        cls.lfo_entries = loadfn(os.path.join(test_path, "Li-Fe-O.json"))
 
     def test_get_synthesis_tree(self):
         target = "LiFeO2"
