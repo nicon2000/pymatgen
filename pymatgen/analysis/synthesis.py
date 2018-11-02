@@ -96,8 +96,14 @@ class PDSynthesisTreeTest(PymatgenTest):
         print_rxn_tree(rxn_tree, target)
         # Balancing rxn is costly due to inefficient implementation for now,
         # and creates lots of visual noise. We do this for this small system to
-        # illustrate what it is for. In most cases, we just want to know the phases participating in the reaction.
+        # illustrate what it is for. In most cases, we just want to know the
+        # phases participating in the reaction.
         print_rxn_tree(rxn_tree, target, balanced_rxn_str=True)
+
+        # This breaks everything to elements
+        a = PDSynthesisTree(self.lfo_entries, 1)
+        rxn_tree = a.get_reaction_tree(target)
+        print_rxn_tree(rxn_tree, target)
 
 
 if __name__ == "__main__":
