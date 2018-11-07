@@ -26,11 +26,13 @@ class PDSynthesisTree:
     elements.
     """
 
-    def __init__(self, entries, max_nelements=2):
+    def __init__(self, entries, target, max_nelements=2):
         """
         Args:
             entries ([ComputedEntry]): The computed entries from which to
                 perform the phase diagram analysis.
+            target (Composition/str): Target composition to get synthesis tree
+                for.
             max_nelements (float): This sets a limit as to how many
                 elements each reactant should have before the analysis is
                 stopped. Default is 2 for binaries. Set to 1 for elements.
@@ -38,28 +40,16 @@ class PDSynthesisTree:
         self.pd = PhaseDiagram(entries)
         self.stable_entries = self.pd.stable_entries
         self.max_nelements = max_nelements
-
-    def get_synthesis_tree(self, target):
-        """
-        Generates synthesis tree for a target.
-
-        Args:
-            target (Composition/str): Target composition to get synthesis tree
-                for.
-
-        Returns:
-            anytree.Node containing the entire synthesis tree.
-        """
-        target = Composition(target)
+        self.target = Composition(target)
 
         def _get_tree(parent, to_remove):
             # Recursive algo to get all reactions
             to_remove = set(to_remove)
-            to_remove.add(target.reduced_formula)
+            to_remove.add(self.target.reduced_formula)
             new_stable = [e for e in self.stable_entries if
                           e.composition.reduced_formula not in to_remove]
             pd = PhaseDiagram(new_stable)
-            decomp = pd.get_decomposition(target)
+            decomp = pd.get_decomposition(self.target)
             rx_str = " + ".join(
                 sorted([e.composition.reduced_formula for e in decomp.keys()]))
             child = Node(rx_str, parent, decomp=decomp,
@@ -71,17 +61,16 @@ class PDSynthesisTree:
                     _get_tree(child, to_remove)
             return parent
 
-        t = Node(target.reduced_formula,
+        t = Node(self.target.reduced_formula,
                  decomp={PDEntry(target, 0): 1},
                  avg_nelements=len(target))
 
-        return _get_tree(t, set())
+        self.rxn_tree = _get_tree(t, set())
 
-    def get_unique_reactions(self, target):
-        rxn_tree = self.get_synthesis_tree(target)
+    def get_unique_reactions(self):
         nodes = []
         names = set()
-        for pre, fill, node in RenderTree(rxn_tree):
+        for pre, fill, node in RenderTree(self.rxn_tree):
             if node.name not in names:
                 nodes.append(node)
                 names.add(node.name)
@@ -95,11 +84,11 @@ class PDSynthesisTree:
         return PDSynthesisTree(entries, **kwargs)
 
 
-def print_rxn_tree(rxn_tree, target, balanced_rxn_str=False):
-    for pre, fill, node in RenderTree(rxn_tree):
+def print_rxn_tree(rxn_tree, balanced_rxn_str=False):
+    for pre, fill, node in RenderTree(rxn_tree.rxn_tree):
         if balanced_rxn_str:
             rxn = Reaction(sorted([e.composition for e in node.decomp.keys()]),
-                           [Composition(target)])
+                           [rxn_tree.target])
             name = str(rxn).split("-")[0]
         else:
             name = node.name
@@ -121,21 +110,19 @@ class PDSynthesisTreeTest(PymatgenTest):
 
     def test_get_synthesis_tree(self):
         target = "LiFeO2"
-        a = PDSynthesisTree(self.lfo_entries)
-        rxn_tree = a.get_synthesis_tree(target)
-        print_rxn_tree(rxn_tree, target)
+        rxn_tree = PDSynthesisTree(self.lfo_entries, target)
+        print_rxn_tree(rxn_tree)
         # Balancing rxn is costly due to inefficient implementation for now,
         # and creates lots of visual noise. We do this for this small system to
         # illustrate what it is for. In most cases, we just want to know the
         # phases participating in the reaction.
-        print_rxn_tree(rxn_tree, target, balanced_rxn_str=True)
+        print_rxn_tree(rxn_tree, balanced_rxn_str=True)
 
         # This breaks everything to elements
-        a = PDSynthesisTree(self.lfo_entries, 1)
-        rxn_tree = a.get_synthesis_tree(target)
-        print_rxn_tree(rxn_tree, target)
+        a = PDSynthesisTree(self.lfo_entries, target, 1)
+        print_rxn_tree(rxn_tree)
 
-        for rxn in a.get_unique_reactions(target):
+        for rxn in a.get_unique_reactions():
             print("%s (avg_nelements = %.2f)" % (rxn.name, rxn.avg_nelements))
 
 
