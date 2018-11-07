@@ -8,7 +8,7 @@ import logging
 
 from pymatgen import MPRester, Composition
 from pymatgen.analysis.phase_diagram import PhaseDiagram, PDPlotter, PDEntry
-from pymatgen.analysis.reaction_calculator import Reaction
+from pymatgen.analysis.reaction_calculator import Reaction, ComputedReaction
 import numpy as np
 from anytree import Node, RenderTree
 
@@ -40,16 +40,16 @@ class PDSynthesisTree:
         self.pd = PhaseDiagram(entries)
         self.stable_entries = self.pd.stable_entries
         self.max_nelements = max_nelements
-        self.target = Composition(target)
+        self.target = PDEntry(target, 0)
 
         def _get_tree(parent, to_remove):
             # Recursive algo to get all reactions
             to_remove = set(to_remove)
-            to_remove.add(self.target.reduced_formula)
+            to_remove.add(self.target.composition.reduced_formula)
             new_stable = [e for e in self.stable_entries if
                           e.composition.reduced_formula not in to_remove]
             pd = PhaseDiagram(new_stable)
-            decomp = pd.get_decomposition(self.target)
+            decomp = pd.get_decomposition(self.target.composition)
             rx_str = " + ".join(
                 sorted([e.composition.reduced_formula for e in decomp.keys()]))
             child = Node(rx_str, parent, decomp=decomp,
@@ -61,8 +61,8 @@ class PDSynthesisTree:
                     _get_tree(child, to_remove)
             return parent
 
-        t = Node(self.target.reduced_formula,
-                 decomp={PDEntry(target, 0): 1},
+        t = Node(self.target.composition.reduced_formula,
+                 decomp={self.target: 1},
                  avg_nelements=len(target))
 
         self.rxn_tree = _get_tree(t, set())
@@ -87,12 +87,18 @@ class PDSynthesisTree:
 def print_rxn_tree(rxn_tree, balanced_rxn_str=False):
     for pre, fill, node in RenderTree(rxn_tree.rxn_tree):
         if balanced_rxn_str:
-            rxn = Reaction(sorted([e.composition for e in node.decomp.keys()]),
-                           [rxn_tree.target])
+            rxn = ComputedReaction(sorted([e for e in node.decomp.keys()],
+                                          key=lambda e: e.composition.reduced_formula),
+                                   [rxn_tree.target])
+
             name = str(rxn).split("-")[0]
+            output = "%s%s (avg_nelements = %.2f, energy=%.3f)" % (
+                pre, name, node.avg_nelements, rxn.calculated_reaction_energy)
         else:
             name = node.name
-        print("%s%s (avg_nelements = %.2f)" % (pre, name, node.avg_nelements))
+            output = "%s%s (avg_nelements = %.2f)" % (pre, name,
+                                                      node.avg_nelements)
+        print(output)
 
 
 from pymatgen.util.testing import PymatgenTest
@@ -105,7 +111,9 @@ class PDSynthesisTreeTest(PymatgenTest):
         from monty.serialization import loadfn
         import pymatgen
         import os
-        test_path = os.path.join(os.path.abspath(os.path.dirname(pymatgen.__file__)), "..", "test_files")
+        test_path = os.path.join(
+            os.path.abspath(os.path.dirname(pymatgen.__file__)), "..",
+            "test_files")
         cls.lfo_entries = loadfn(os.path.join(test_path, "Li-Fe-O.json"))
 
     def test_get_synthesis_tree(self):
