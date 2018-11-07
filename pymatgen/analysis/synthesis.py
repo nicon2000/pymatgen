@@ -91,7 +91,7 @@ class PDSynthesisTree:
                                        [self.target])
 
                 name = str(rxn).split("-")[0]
-                output = "%s%s (avg_nelements = %.2f, energy=%.3f)" % (
+                output = "%s%s (avg_nelements = %.2f, energy = %.3f)" % (
                     pre, name, node.avg_nelements, rxn.calculated_reaction_energy)
             else:
                 name = node.name
