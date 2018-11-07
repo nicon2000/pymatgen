@@ -83,22 +83,21 @@ class PDSynthesisTree:
         entries = mpr.get_entries_in_chemsys(chemsys)
         return PDSynthesisTree(entries, **kwargs)
 
+    def print(self, balanced_rxn_str=False):
+        for pre, fill, node in RenderTree(self.rxn_tree):
+            if balanced_rxn_str:
+                rxn = ComputedReaction(sorted([e for e in node.decomp.keys()],
+                                              key=lambda e: e.composition.reduced_formula),
+                                       [self.target])
 
-def print_rxn_tree(rxn_tree, balanced_rxn_str=False):
-    for pre, fill, node in RenderTree(rxn_tree.rxn_tree):
-        if balanced_rxn_str:
-            rxn = ComputedReaction(sorted([e for e in node.decomp.keys()],
-                                          key=lambda e: e.composition.reduced_formula),
-                                   [rxn_tree.target])
-
-            name = str(rxn).split("-")[0]
-            output = "%s%s (avg_nelements = %.2f, energy=%.3f)" % (
-                pre, name, node.avg_nelements, rxn.calculated_reaction_energy)
-        else:
-            name = node.name
-            output = "%s%s (avg_nelements = %.2f)" % (pre, name,
-                                                      node.avg_nelements)
-        print(output)
+                name = str(rxn).split("-")[0]
+                output = "%s%s (avg_nelements = %.2f, energy=%.3f)" % (
+                    pre, name, node.avg_nelements, rxn.calculated_reaction_energy)
+            else:
+                name = node.name
+                output = "%s%s (avg_nelements = %.2f)" % (pre, name,
+                                                          node.avg_nelements)
+            print(output)
 
 
 from pymatgen.util.testing import PymatgenTest
@@ -116,19 +115,19 @@ class PDSynthesisTreeTest(PymatgenTest):
             "test_files")
         cls.lfo_entries = loadfn(os.path.join(test_path, "Li-Fe-O.json"))
 
-    def test_get_synthesis_tree(self):
+    def test_func(self):
         target = "LiFeO2"
         rxn_tree = PDSynthesisTree(self.lfo_entries, target)
-        print_rxn_tree(rxn_tree)
+        rxn_tree.print()
         # Balancing rxn is costly due to inefficient implementation for now,
         # and creates lots of visual noise. We do this for this small system to
         # illustrate what it is for. In most cases, we just want to know the
         # phases participating in the reaction.
-        print_rxn_tree(rxn_tree, balanced_rxn_str=True)
+        rxn_tree.print(balanced_rxn_str=True)
 
         # This breaks everything to elements
         a = PDSynthesisTree(self.lfo_entries, target, 1)
-        print_rxn_tree(rxn_tree)
+        rxn_tree.print()
 
         for rxn in a.get_unique_reactions():
             print("%s (avg_nelements = %.2f)" % (rxn.name, rxn.avg_nelements))
