@@ -94,7 +94,7 @@ class PDSynthesisTree:
                 pathways.append(path)
 
         for p in pathways:
-            ref = p[0].rxn.calculated_reaction_energy
+            ref = p[-1].rxn.calculated_reaction_energy
             for k in p:
                 print("%s, %.3f" % (k.name, k.rxn.calculated_reaction_energy - ref))
 
@@ -113,6 +113,17 @@ class PDSynthesisTree:
                     node.rxn.calculated_reaction_energy)
             print(output)
 
+
+def plot_pathways(pathways):
+    from pymatgen.util.plotting import pretty_plot
+    colors = ["r", "g", "b", "c", "m", "y", "k"]
+    plt = pretty_plot(12, 8)
+    for i, p in enumerate(pathways):
+        for j, k in enumerate(p):
+            energy = k.rxn.calculated_reaction_energy
+            plt.plot([j, j+1], [-energy, -energy], color=colors[i % len(colors)], linestyle='solid')
+            plt.text(j, -energy, k.name)
+    plt.show()
 
 from pymatgen.util.testing import PymatgenTest
 
@@ -140,7 +151,11 @@ class PDSynthesisTreeTest(PymatgenTest):
 
         for rxn in a.get_unique_reactions():
             print("%s (avg_nelements = %.2f)" % (rxn.name, rxn.avg_nelements))
-        rxn_tree.get_pathways()
+
+        rxn_tree = PDSynthesisTree(self.lfo_entries, "Li2FeO3")
+        pathways = rxn_tree.get_pathways()
+        plot_pathways(pathways)
+
 
 
 if __name__ == "__main__":
