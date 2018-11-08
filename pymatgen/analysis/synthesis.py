@@ -9,6 +9,7 @@ import logging
 from pymatgen import MPRester
 from pymatgen.analysis.phase_diagram import PhaseDiagram, PDPlotter, PDEntry
 from pymatgen.analysis.reaction_calculator import ComputedReaction
+from pymatgen.entries.computed_entries import ComputedEntry
 import numpy as np
 from anytree import Node, RenderTree, PreOrderIter
 
@@ -40,7 +41,10 @@ class PDSynthesisTree:
         self.pd = PhaseDiagram(entries)
         self.stable_entries = self.pd.stable_entries
         self.max_nelements = max_nelements
-        self.target = PDEntry(target, 0)
+        if not isinstance(target, ComputedEntry):
+            self.target = PDEntry(target, 0)
+        else:
+            self.target = target
 
         def _get_tree(parent, to_remove):
             # Recursive algo to get all reactions
@@ -68,7 +72,7 @@ class PDSynthesisTree:
         rxn = ComputedReaction([self.target], [self.target])
         t = Node(self.target.composition.reduced_formula,
                  decomp={self.target: 1},
-                 avg_nelements=len(target), rxn=rxn)
+                 avg_nelements=len(self.target.composition), rxn=rxn)
 
         self.rxn_tree = _get_tree(t, set())
 
@@ -152,7 +156,10 @@ class PDSynthesisTreeTest(PymatgenTest):
         for rxn in a.get_unique_reactions():
             print("%s (avg_nelements = %.2f)" % (rxn.name, rxn.avg_nelements))
 
-        rxn_tree = PDSynthesisTree(self.lfo_entries, "Li2FeO3")
+        lfpo = MPRester().get_entries_in_chemsys(["Li", "Fe", "P", "O"])
+        lifepo4 = [e for e in lfpo if e.composition.reduced_formula == "LiFePO4"]
+        lifepo4 = min(lifepo4, key=lambda e: e.energy_per_atom)
+        rxn_tree = PDSynthesisTree(lfpo, lifepo4)
         pathways = rxn_tree.get_pathways()
         plot_pathways(pathways)
 
