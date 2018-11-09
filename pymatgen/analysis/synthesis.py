@@ -127,6 +127,8 @@ def plot_pathways(pathways):
             energy = k.rxn.calculated_reaction_energy
             plt.plot([j, j+1], [-energy, -energy], color=colors[i % len(colors)], linestyle='solid')
             plt.text(j, -energy, k.name)
+        if i > 6:
+            break
     plt.show()
 
 from pymatgen.util.testing import PymatgenTest
