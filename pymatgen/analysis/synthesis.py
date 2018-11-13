@@ -68,7 +68,7 @@ class PDSynthesisTree:
         rxn = ComputedReaction([self.target], [self.target])
         t = Node(self.target.composition.reduced_formula,
                  decomp={self.target: 1},
-                 avg_nelements=len(target), rxn=rxn)
+                 avg_nelements=len(self.target.composition), rxn=rxn)
 
         self.rxn_tree = _get_tree(t, set())
 
@@ -136,7 +136,7 @@ class PDSynthesisTreeTest(PymatgenTest):
 
         # This breaks everything to elements
         a = PDSynthesisTree(self.lfo_entries, target, 1)
-        rxn_tree.print()
+        a.print()
 
         for rxn in a.get_unique_reactions():
             print("%s (avg_nelements = %.2f)" % (rxn.name, rxn.avg_nelements))
