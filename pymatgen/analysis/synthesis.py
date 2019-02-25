@@ -27,14 +27,15 @@ class PDSynthesisTree:
     elements.
     """
 
-    def __init__(self, entries, target, max_nelements=2):
+    def __init__(self, entries: "list", target: "Composition",
+                 max_nelements: "int" = 2):
         """
         Args:
             entries ([ComputedEntry]): The computed entries from which to
                 perform the phase diagram analysis.
             target (Composition/str): Target composition to get synthesis tree
                 for.
-            max_nelements (float): This sets a limit as to how many
+            max_nelements (int): This sets a limit as to how many
                 elements each reactant should have before the analysis is
                 stopped. Default is 2 for binaries. Set to 1 for elements.
         """
