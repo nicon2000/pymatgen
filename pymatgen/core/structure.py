@@ -1667,6 +1667,7 @@ class IStructure(SiteCollection, MSONable):
         Returns:
             Structure.
         """
+        filename = str(filename)
         if filename.endswith(".nc"):
             # Read Structure from a netcdf file.
             from pymatgen.io.abinit.netcdf import structure_from_ncdata
@@ -1789,7 +1790,8 @@ class IMolecule(SiteCollection, MSONable):
         nelectrons = 0
         for site in sites:
             for sp, amt in site.species_and_occu.items():
-                nelectrons += sp.Z * amt
+                if not isinstance(sp, DummySpecie):
+                    nelectrons += sp.Z * amt
         nelectrons -= charge
         self._nelectrons = nelectrons
         if spin_multiplicity:
@@ -1996,23 +1998,10 @@ class IMolecule(SiteCollection, MSONable):
         Returns:
             Molecule object
         """
-        species = []
-        coords = []
-        props = collections.defaultdict(list)
-
-        for site_dict in d["sites"]:
-            species.append({Specie(sp["element"], sp["oxidation_state"])
-                            if "oxidation_state" in sp else
-                            Element(sp["element"]): sp["occu"]
-                            for sp in site_dict["species"]})
-            coords.append(site_dict["xyz"])
-            siteprops = site_dict.get("properties", {})
-            for k, v in siteprops.items():
-                props[k].append(v)
-
-        return cls(species, coords, charge=d.get("charge", 0),
-                   spin_multiplicity=d.get("spin_multiplicity"),
-                   site_properties=props)
+        sites = [Site.from_dict(sd) for sd in d["sites"]]
+        charge = d.get("charge", 0)
+        spin_multiplicity = d.get("spin_multiplicity")
+        return cls.from_sites(sites, charge=charge, spin_multiplicity=spin_multiplicity)
 
     def get_distance(self, i, j):
         """
@@ -2292,6 +2281,7 @@ class IMolecule(SiteCollection, MSONable):
         Returns:
             Molecule
         """
+        filename = str(filename)
         from pymatgen.io.gaussian import GaussianOutput
         with zopen(filename) as f:
             contents = f.read()
@@ -3159,7 +3149,7 @@ class Structure(IStructure, collections.MutableSequence):
                 if mode == "s":
                     species += sp
                 offset = self[i].frac_coords - coords
-                coords += ((offset - np.round(offset)) / (n + 2)).astype(
+                coords = coords + ((offset - np.round(offset)) / (n + 2)).astype(
                     coords.dtype)
                 for key in props.keys():
                     if props[key] is not None and self[i].properties[key] != props[key]:

@@ -43,6 +43,7 @@ except:
     ob = None
 
 from monty.dev import requires
+from monty.serialization import loadfn
 
 from bisect import bisect_left
 from scipy.spatial import Voronoi
@@ -50,21 +51,16 @@ from scipy.spatial import Voronoi
 from pymatgen import Element
 from pymatgen.analysis.bond_valence import BV_PARAMS, BVAnalyzer
 
-default_op_params = {}
-with open(os.path.join(os.path.dirname(
-        __file__), 'op_params.yaml'), "rt") as f:
+
+_directory = os.path.join(os.path.dirname(__file__))
+
+with open(os.path.join(_directory, 'op_params.yaml'), "rt") as f:
     default_op_params = yaml.safe_load(f)
-    f.close()
 
-cn_opt_params = {}
-with open(os.path.join(os.path.dirname(
-        __file__), 'cn_opt_params.yaml'), 'r') as f:
+with open(os.path.join(_directory, 'cn_opt_params.yaml'), 'r') as f:
     cn_opt_params = yaml.safe_load(f)
-    f.close()
 
-file_dir = os.path.dirname(__file__)
-rad_file = os.path.join(file_dir, 'ionic_radii.json')
-with open(rad_file, 'r') as fp:
+with open(os.path.join(_directory, 'ionic_radii.json'), 'r') as fp:
     _ion_radii = json.load(fp)
 
 
@@ -485,17 +481,25 @@ class NearNeighbors:
         return list(all_sites.values())
 
     @staticmethod
-    def _get_image(frac_coords):
+    def _get_image(structure, site):
         """Private convenience method for get_nn_info,
-        gives lattice image from provided PeriodicSite.
+        gives lattice image from provided PeriodicSite and Structure.
+
+        Image is defined as displacement from original site in structure to a given site.
+        i.e. if structure has a site at (-0.1, 1.0, 0.3), then (0.9, 0, 2.3) -> jimage = (1, -1, 2).
+        Note that this method takes O(number of sites) due to searching an original site.
 
         Args:
-            frac_coords ([float]*3): Fraction coordinates
+            structure: Structure Object
+            site: PeriodicSite Object
+
         Returns:
-            ((int)*3) Lattice image
+            image: ((int)*3) Lattice image
         """
-        # TODO: This is not numerically stable. Also, move to PeriodicSite? -WardLT, 23Jun18
-        return tuple(map(int, np.floor(frac_coords)))
+        original_site = structure[NearNeighbors._get_original_site(structure, site)]
+        image = np.around(np.subtract(site.frac_coords, original_site.frac_coords))
+        image = tuple(image.astype(int))
+        return image
 
     @staticmethod
     def _get_original_site(structure, site):
@@ -960,7 +964,7 @@ class VoronoiNN(NearNeighbors):
             if nstats[self.weight] > self.tol * max_weight \
                     and self._is_in_targets(site, targets):
                 nn_info = {'site': site,
-                           'image': self._get_image(site.frac_coords),
+                           'image': self._get_image(structure, site),
                            'weight': nstats[self.weight] / max_weight,
                            'site_index': self._get_original_site(
                                structure, site)}
@@ -1076,7 +1080,7 @@ class JmolNN(NearNeighbors):
             if dist <= (bonds[(site.specie, neighb.specie)]) and (dist > self.min_bond_distance):
                 weight = min_rad / dist
                 siw.append({'site': neighb,
-                            'image': self._get_image(neighb.frac_coords),
+                            'image': self._get_image(structure, neighb),
                             'weight': weight,
                             'site_index': self._get_original_site(structure, neighb)})
         return siw
@@ -1126,7 +1130,7 @@ class MinimumDistanceNN(NearNeighbors):
             if dist < (1.0 + self.tol) * min_dist:
                 w = min_dist / dist
                 siw.append({'site': s,
-                            'image': self._get_image(s.frac_coords),
+                            'image': self._get_image(structure, s),
                             'weight': w,
                             'site_index': self._get_original_site(structure, s)})
         return siw
@@ -1455,7 +1459,7 @@ class MinimumOKeeffeNN(NearNeighbors):
             if reldist < (1.0 + self.tol) * min_reldist:
                 w = min_reldist / reldist
                 siw.append({'site': s,
-                            'image': self._get_image(s.frac_coords),
+                            'image': self._get_image(structure, s),
                             'weight': w,
                             'site_index': self._get_original_site(structure, s)})
 
@@ -1514,7 +1518,7 @@ class MinimumVIRENN(NearNeighbors):
             if reldist < (1.0 + self.tol) * min_reldist:
                 w = min_reldist / reldist
                 siw.append({'site': s,
-                            'image': self._get_image(s.frac_coords),
+                            'image': self._get_image(vire.structure, s),
                             'weight': w,
                             'site_index': self._get_original_site(vire.structure, s)})
 
@@ -2939,7 +2943,7 @@ class BrunnerNN_reciprocal(NearNeighbors):
             if dist < d_max + self.tol:
                 w = ds[0] / dist
                 siw.append({'site': s,
-                            'image': self._get_image(s.frac_coords),
+                            'image': self._get_image(structure, s),
                             'weight': w,
                             'site_index': self._get_original_site(structure, s)})
         return siw
@@ -2978,7 +2982,7 @@ class BrunnerNN_relative(NearNeighbors):
             if dist < d_max + self.tol:
                 w = ds[0] / dist
                 siw.append({'site': s,
-                            'image': self._get_image(s.frac_coords),
+                            'image': self._get_image(structure, s),
                             'weight': w,
                             'site_index': self._get_original_site(structure, s)})
         return siw
@@ -3017,7 +3021,7 @@ class BrunnerNN_real(NearNeighbors):
             if dist < d_max + self.tol:
                 w = ds[0] / dist
                 siw.append({'site': s,
-                            'image': self._get_image(s.frac_coords),
+                            'image': self._get_image(structure, s),
                             'weight': w,
                             'site_index': self._get_original_site(structure, s)})
         return siw
@@ -3058,7 +3062,7 @@ class EconNN(NearNeighbors):
                 w = exp(1 - (dist / weighted_avg)**6)
                 if w > self.tol:
                     siw.append({'site': s,
-                                'image': self._get_image(s.frac_coords),
+                                'image': self._get_image(structure, s),
                                 'weight': w,
                                 'site_index': self._get_original_site(structure, s)})
         return siw
@@ -3496,6 +3500,26 @@ class CutOffDictNN(NearNeighbors):
                 self._max_dist = dist
         self._lookup_dict = lookup_dict
 
+    @staticmethod
+    def from_preset(preset):
+        """
+        Initialise a CutOffDictNN according to a preset set of cut-offs.
+
+        Args:
+            preset (str): A preset name. The list of supported presets are:
+
+                - "vesta_2019": The distance cut-offs used by the VESTA
+                  visualisation program.
+
+        Returns:
+            A CutOffDictNN using the preset cut-off dictionary.
+        """
+        if preset == 'vesta_2019':
+            cut_offs = loadfn(os.path.join(_directory, 'vesta_cutoffs.yaml'))
+            return CutOffDictNN(cut_off_dict=cut_offs)
+        else:
+            raise ValueError("Unrecognised preset: {}".format(preset))
+
     def get_nn_info(self, structure, n):
 
         site = structure[n]
@@ -3513,7 +3537,7 @@ class CutOffDictNN(NearNeighbors):
 
                 nn_info.append({
                     'site': n_site,
-                    'image': self._get_image(n_site.frac_coords),
+                    'image': self._get_image(structure, n_site),
                     'weight': dist,
                     'site_index': self._get_original_site(structure, n_site)
                 })
