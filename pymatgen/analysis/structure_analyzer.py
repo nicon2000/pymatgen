@@ -42,9 +42,11 @@ def average_coordination_number(structures, freq=10):
     Calculates the ensemble averaged Voronoi coordination numbers
     of a list of Structures using VoronoiNN.
     Typically used for analyzing the output of a Molecular Dynamics run.
+
     Args:
         structures (list): list of Structures.
         freq (int): sampling frequency of coordination number [every freq steps].
+
     Returns:
         Dictionary of elements as keys and average coordination numbers as values.
     """
