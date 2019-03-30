@@ -1,7 +1,8 @@
-from pymatgen.core.structure import Structure
+from pymatgen.core.structure import Structure, PeriodicSite
 from pymatgen.core.periodic_table import get_el_sp
 from enum import Enum
 import itertools
+import numpy as np
 
 
 class PolySharing(Enum):
@@ -18,21 +19,26 @@ class CoordPoly:
 
     def __init__(self, center, anions):
         self.center = center
+        self.anions = anions
         self.anion_sites = []
         self.anion_indices = []
+        comp = center.species
         for s, d, i in anions:
             self.anion_sites.append(s)
             self.anion_indices.append(i)
+            comp += s.species
+        self.composition = comp
 
     def get_sharing(self, coord_poly):
-        shared = set(self.anion_sites).intersection(coord_poly.anion_sites)
-        return PolySharing(len(shared))
+        mappings = []
+        for s1, s2 in itertools.product(self.anion_sites, coord_poly.anion_sites):
+            if np.allclose(s1.coords, s2.coords):
+                mappings.append([s1, s2])
+        return PolySharing(len(mappings))
 
     def __str__(self):
-        comp = self.center.species
-        for s in self.anion_sites:
-            comp += s.species
-        return "%s centered at %s" % (comp.reduced_formula, self.center.frac_coords)
+        return "%s %s" % (self.composition.reduced_formula,
+                          self.center.frac_coords)
 
 
 class PolyStructure(Structure):
@@ -73,6 +79,29 @@ class PolyStructure(Structure):
         self.anion_species = anion_species
         self.cutoff_radius = cutoff_radius
 
+    def print_poly_sharing(self):
+        # Find self-sharing with itself across PBC.
+        for poly in self.polys:
+            for image in itertools.product([-1, 0, 1], [-1, 0, 1], [-1, 0, 1]):
+                if not np.allclose(image, [0, 0, 0]):
+                    c = poly.center
+                    c = PeriodicSite(c.species, c.frac_coords + image, c.lattice)
+                    asites = poly.anions
+                    asites = [(PeriodicSite(s.species, s.frac_coords + image, s.lattice), d, i)
+                              for s, d , i in asites]
+                    image_poly = CoordPoly(c, asites)
+                    sharing = poly.get_sharing(image_poly)
+                    if sharing != PolySharing.NON:
+                        print("Poly %s shares %s with itself" % (poly, sharing.name))
+                        break
+
+        for poly1, poly2 in itertools.combinations(self.polys, 2):
+            sharing = poly1.get_sharing(poly2)
+            if sharing != PolySharing.NON:
+                print("%s-%s: %s" % (poly1.composition.reduced_formula,
+                                     poly2.composition.reduced_formula,
+                                     sharing.name))
+
 
 from pymatgen.util.testing import PymatgenTest
 
@@ -80,15 +109,9 @@ from pymatgen.util.testing import PymatgenTest
 class PolyStructureTest(PymatgenTest):
 
     def test_init(self):
-        structure = self.get_structure("LiFePO4")
+        structure = self.get_structure("Li2O")
         polystructure = PolyStructure(structure)
-        for poly1, poly2 in itertools.combinations(polystructure.polys, 2):
-            sharing = poly1.get_sharing(poly2)
-            if sharing != PolySharing.NON:
-                print(poly1)
-                print(poly2)
-                print(sharing)
-                print()
+        polystructure.print_poly_sharing()
 
 
 if __name__ == "__main__":
