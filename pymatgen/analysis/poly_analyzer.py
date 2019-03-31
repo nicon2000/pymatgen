@@ -105,7 +105,14 @@ class PolyStructure(Structure):
         self.anion_species = anion_species
         self.cutoff_radius = cutoff_radius
 
-    def get_connections(self):
+    def get_connections(self) -> dict:
+        """
+        Returns:
+            Dict of the format {(i1, i2): set([PolySharing]), where i1, i2
+            refers to the index of self.polys and the set is all discovered
+            types of polyhedra sharing (there can be more than one). Note that
+            a poly can share corners/edges/faces with itself through PBC.
+        """
         connections = collections.defaultdict(set)
         n = len(self.polys)
         for i1 in range(n):
@@ -158,6 +165,7 @@ class PolyStructureTest(PymatgenTest):
         structure = self.get_structure("Li10GeP2S12")
         polystructure = PolyStructure(structure)
         polystructure.print_connections()
+
 
 if __name__ == "__main__":
     import unittest
